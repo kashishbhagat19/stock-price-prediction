@@ -5,3 +5,5 @@ pandas
 yfinance
 matplotlib
 pandas_datareader
+alpha_vantage
+
