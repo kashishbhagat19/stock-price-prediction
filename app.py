@@ -1,23 +1,26 @@
 import numpy as np
 import pandas as pd
+import requests
 import matplotlib.pyplot as plt
 import pandas_datareader as data
 from tensorflow.keras.models import load_model 
 import streamlit as st 
 from datetime import date
 
-import yfinance as yf
+# import yfinance as yf
 # start = '2010-01-01'
 # end = '2026-12-31'
+from alpha_vantage.timeseries import TimeSeries
+
 
 #New
 st.set_page_config(page_title="Stock Price Predictor", layout="centered")
-st.title("📈 Stock Price Prediction App")
+st.title("📈 Stock Price Predictor")
 st.caption("Powered by LSTM, TensorFlow, and yFinance")
 st.markdown("---")
 #End
 
-st.title('Stock Price Prediction')
+# st.title('Stock Price Prediction')
 
 # user_input = st.text_input('Enter Stock Ticker','AAPL')
 #New
@@ -29,19 +32,43 @@ if custom_ticker:
 st.markdown("### 📍 Selected Stock Ticker: " + user_input)
 st.markdown(f"[🔎 View {user_input} on Yahoo Finance](https://finance.yahoo.com/quote/{user_input})", unsafe_allow_html=True)
 
-try:
-    ticker_info = yf.Ticker(user_input).info
-    company_name = ticker_info.get("longName", "N/A")
-    sector = ticker_info.get("sector", "N/A")
-    country = ticker_info.get("country", "N/A")
-    summary = ticker_info.get("longBusinessSummary", "Summary not available.")
+# try:
+#     # ticker_info = yf.Ticker(user_input).info
+#     # company_name = ticker_info.get("longName", "N/A")
+#     # sector = ticker_info.get("sector", "N/A")
+#     # country = ticker_info.get("country", "N/A")
+#     # summary = ticker_info.get("longBusinessSummary", "Summary not available.")
+#   
 
+#     st.markdown(f"### 🏢 {company_name}")
+#     st.markdown(f"**Sector:** {sector} | **Country:** {country}")
+#     st.markdown(f"**🔍 Company Overview:**\n\n{summary}")
+# except Exception as e:
+#     st.warning("Could not fetch company info. Check if the ticker is valid.")
+#End
+
+#New
+import requests
+
+# Alpha Vantage API Key
+api_key = 'IX55TYGYSZY8EVNQ'  # Replace with your key
+
+# Fetch company info
+company_url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={user_input}&apikey={api_key}'
+response = requests.get(company_url)
+if response.status_code == 200:
+    company_data = response.json()
+    company_name = company_data.get("Name", "N/A")
+    sector = company_data.get("Sector", "N/A")
+    country = company_data.get("Country", "N/A")
+    description = company_data.get("Description", "No description available.")
+    
     st.markdown(f"### 🏢 {company_name}")
     st.markdown(f"**Sector:** {sector} | **Country:** {country}")
-    st.markdown(f"**🔍 Company Overview:**\n\n{summary}")
-except Exception as e:
-    st.warning("Could not fetch company info. Check if the ticker is valid.")
-#End
+    st.markdown(f"**🔍 Company Overview:**\n\n{description}")
+else:
+    st.warning("Could not fetch company info. Try again later.")
+#end
 
 col1, col2 = st.columns(2)
 with col1:
@@ -53,7 +80,27 @@ if start_date >= end_date:
     st.error("⚠️ End date must be after start date.")
 else:
     with st.spinner("📡 Downloading data and predicting..."):#New
-        df = yf.download(user_input, start = start_date, end = end_date)
+        # df = yf.download(user_input, start = start_date, end = end_date)
+        # start
+        api_key = 'IX55TYGYSZY8EVNQ'  # Replace with your actual key
+        ts = TimeSeries(key=api_key, output_format='pandas')
+
+        try:
+            df, _ = ts.get_daily(symbol=user_input, outputsize='full')
+            df.index = pd.to_datetime(df.index)
+            df = df.sort_index()
+            df = df.loc[(df.index >= pd.to_datetime(start_date)) & (df.index <= pd.to_datetime(end_date))]
+            df.rename(columns={
+                '1. open': 'Open',
+                '2. high': 'High',
+                '3. low': 'Low',
+                '4. close': 'Close',
+                '5. volume': 'Volume'
+                }, inplace=True)
+        except Exception as e:
+            st.error(f"❌ Failed to fetch data for {user_input}: {str(e)}")
+            df = pd.DataFrame()
+# end
 
 
 #Describing the Data
